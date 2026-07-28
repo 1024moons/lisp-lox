@@ -28,18 +28,18 @@
 
 (defclass token ()
   ((tok-type
-    :initarg tok-type
+    :initarg :tok-type
     :accessor tok-type
     :type token-type)
    (lexeme
-    :initarg lexeme
+    :initarg :lexeme
     :accessor lexeme
     :type string)
    (literal
-    :initarg literal
+    :initarg :literal
     :accessor tok-literal)
    (line
-    :initarg line
+    :initarg :line
     :accessor tok-line
     :type integer)))
 

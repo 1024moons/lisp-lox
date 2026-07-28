@@ -2,4 +2,6 @@
   :description "An implementation of the simple tree-walking interpreter in common lisp"
   :author "Talha Qamar"
   :depends-on ("alexandria")
-  :components ((:file "lox")))
+  :components ((:file "lox")
+               (:file "tokens" :depends-on ("lox"))
+               (:file "scanner" :depends-on ("lox" "tokens"))))

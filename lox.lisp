@@ -8,11 +8,16 @@
 (defun start-repl ()
   (loop for input = (read-line *standard-input* nil 'eof)
         until (or (string-equal input "quit") (eq input 'eof))
-        do (run-string input)))
+        do (print (run-string input))))
 
-(defun report-error (line msg &optional where)
-  (format t "[Line ~a] ~a: ~a" line where msg)
-  (setf *had-error* t))
+(defmacro report-error (line msg &rest rest)
+  `(progn
+     (format t "[Line ~a] " ,line)
+     (format t ,msg ,@rest)
+     (setf *had-error* t)))
 
 (defun run-string (input)
-  (setf *had-error* nil))
+  (setf *had-error* nil)
+  (let ((scanner (make-scanner input)))
+    (scan-tokens scanner)
+    (tokens scanner)))
