@@ -47,11 +47,10 @@
       (with-slots (current source) scanner
         (elt source current))))
 
-;  what i thought the code was
 (defun advance (scanner)
   (with-slots (current source) scanner
     (incf current)
-    (elt source current)))
+    (elt source (1- current))))
 
 (defun scan-token (scanner)
   (labels ((tok-if-match (expected true-tok false-tok)
