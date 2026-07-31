@@ -42,15 +42,24 @@
       (alexandria:appendf tokens (list (make-token token-type lexeme literal line))))))
 
 (defun peek (scanner)
+  (peek-n scanner 0))
+
+(defun peek-next (scanner)
+  (peek-n scanner 1))
+
+(defun peek-n (scanner n)
   (if (is-at-end scanner)
       nil
       (with-slots (current source) scanner
-        (elt source current))))
+        (elt source (+ n current)))))
 
 (defun advance (scanner)
   (with-slots (current source) scanner
     (incf current)
     (elt source (1- current))))
+
+(defun is-char-digit (ch)
+  (char<= #\0 ch #\9))
 
 (defun scan-token (scanner)
   (labels ((tok-if-match (expected true-tok false-tok)
@@ -59,8 +68,10 @@
                ((eql (peek scanner) expected) true-tok)
                (t false-tok)))
            (consume-while-not (ch)
+             (consume-while-pred #'(lambda (c) (char= c ch))))
+           (consume-while-pred (pred)
              (loop for c = (peek scanner)
-                   until (or (not c) (char= c ch))
+                   until (or (not c) (not (funcall pred c)))
                    when (char= c #\Newline)
                      do (incf (line scanner))
                    do (advance scanner)))
@@ -70,7 +81,16 @@
                  (report-error (line scanner) "Unterminated string"))
              (advance scanner)
              (add-token scanner :string (with-slots (source start current) scanner
-                                          (subseq source (1+ start) (1- current))))))
+                                          (subseq source (1+ start) (1- current)))))
+           (consume-number ()
+             (consume-while-pred #'is-char-digit)
+             (when (and (not (is-at-end scanner))
+                        (char= (peek scanner) #\.)
+                        (is-char-digit (peek-next scanner)))
+               (advance scanner)
+               (consume-while-pred #'is-char-digit))
+             (add-token scanner :num (with-slots (source start current) scanner
+                                       (parse-float:parse-float source :start start :end current)))))
     (let* ((c (advance scanner))
            (token-type (case c
                          (#\( :left-paren)
@@ -95,6 +115,8 @@
                          (#\/ (if (char= (peek scanner) #\/)
                                   (consume-while-not #\Newline)
                                   :slash))
-                         (otherwise (report-error (line scanner) "Unrecognized character ~a" c)
+                         (otherwise (if (is-char-digit c)
+                                        (consume-number)
+                                        (report-error (line scanner) "Unrecognized character ~a" c))
                           nil))))
       (if token-type (add-token scanner token-type)))))

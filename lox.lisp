@@ -20,4 +20,4 @@
   (setf *had-error* nil)
   (let ((scanner (make-scanner input)))
     (scan-tokens scanner)
-    (tokens scanner)))
+    (map 'list #'token-to-string (tokens scanner))))
