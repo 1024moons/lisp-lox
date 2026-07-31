@@ -35,6 +35,25 @@
   (with-slots (current source) scanner
     (>= current (length source))))
 
+(defun reserved-words (word)
+  (alexandria:switch (word :test #'string=)
+    ("and" :and)
+    ("class" :class)
+    ("else" :else)
+    ("false" :false)
+    ("for" :for)
+    ("fun" :fun)
+    ("if" :if)
+    ("nil" :nil)
+    ("or" :or)
+    ("print" :print)
+    ("return" :return)
+    ("super" :super)
+    ("this" :this)
+    ("true" :true)
+    ("var" :var)
+    ("while" :while)
+    (otherwise :identifier)))
 
 (defun add-token (scanner token-type &optional literal)
   (with-slots (tokens source start current line) scanner
@@ -61,6 +80,13 @@
 (defun is-char-digit (ch)
   (char<= #\0 ch #\9))
 
+(defun is-char-alphanum (ch)
+  (or (is-char-digit ch) (is-char-alpha ch)))
+
+(defun is-char-alpha (ch)
+  (or (char<= #\a ch #\z)
+      (char<= #\A ch #\Z)))
+
 (defun scan-token (scanner)
   (labels ((tok-if-match (expected true-tok false-tok)
              (cond
@@ -68,7 +94,7 @@
                ((eql (peek scanner) expected) true-tok)
                (t false-tok)))
            (consume-while-not (ch)
-             (consume-while-pred #'(lambda (c) (char= c ch))))
+             (consume-while-pred #'(lambda (c) (not (char= c ch)))))
            (consume-while-pred (pred)
              (loop for c = (peek scanner)
                    until (or (not c) (not (funcall pred c)))
@@ -90,7 +116,11 @@
                (advance scanner)
                (consume-while-pred #'is-char-digit))
              (add-token scanner :num (with-slots (source start current) scanner
-                                       (parse-float:parse-float source :start start :end current)))))
+                                       (parse-float:parse-float source :start start :end current))))
+           (consume-identifier ()
+             (consume-while-pred #'is-char-alphanum)
+             (add-token scanner (reserved-words (with-slots (source current start) scanner
+                                                  (subseq source start current))))))
     (let* ((c (advance scanner))
            (token-type (case c
                          (#\( :left-paren)
@@ -115,8 +145,8 @@
                          (#\/ (if (char= (peek scanner) #\/)
                                   (consume-while-not #\Newline)
                                   :slash))
-                         (otherwise (if (is-char-digit c)
-                                        (consume-number)
-                                        (report-error (line scanner) "Unrecognized character ~a" c))
+                         (otherwise (cond ((is-char-digit c) (consume-number))
+                                          ((is-char-alpha c) (consume-identifier))
+                                          (t (report-error (line scanner) "Unrecognized character ~a" c)))
                           nil))))
       (if token-type (add-token scanner token-type)))))
