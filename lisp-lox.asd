@@ -5,4 +5,5 @@
   :components ((:file "lox")
                (:file "expr")
                (:file "tokens" :depends-on ("lox"))
+               (:file "parser" :depends-on ("expr" "tokens"))
                (:file "scanner" :depends-on ("lox" "tokens"))))

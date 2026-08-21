@@ -17,7 +17,7 @@
     ; literals
     :identifier :string :num
 
-    ;keywords
+    ; keywords
     :and :class :else :false
     :fun :for :if :nil
     :or :print :return :super
