@@ -5,6 +5,21 @@
 
 (defparameter *had-error* nil)
 
+(defgeneric advance (stream)
+  (:documentation "Consume an element from the stream"))
+
+(defgeneric is-at-end (stream)
+  (:documentation "returns whether the stream is entirely consumed"))
+
+(defgeneric peek-n (stream n)
+  :documentation "peeks ahead in the stream")
+
+(defun peek (stream)
+  (peek-n stream 0))
+
+(defun peek-next (scanner)
+  (peek-n stream 1))
+
 (defun start-repl ()
   (loop for input = (read-line *standard-input* nil 'eof)
         until (or (string-equal input "quit") (eq input 'eof))

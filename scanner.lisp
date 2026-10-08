@@ -25,57 +25,51 @@
 (defun make-scanner (source)
   (make-instance 'scanner :source source))
 
+(defmethod peek-n ((stream scanner) n)
+  (if (is-at-end stream)
+      nil
+      (with-slots (current source) stream
+        (elt source (+ n current)))))
+
+(defmethod advance ((stream scanner))
+  (with-slots (current source) stream
+    (incf current)
+    (elt source (1- current))))
+
+(defmethod is-at-end ((stream scanner))
+  (with-slots (current source) stream
+    (>= current (length source))))
+
 (defun scan-tokens (scanner)
   (loop until (is-at-end scanner)
         do (progn
              (setf (start scanner) (current scanner))
              (scan-token scanner))))
 
-(defun is-at-end (scanner)
-  (with-slots (current source) scanner
-    (>= current (length source))))
-
 (defun reserved-words (word)
   (alexandria:switch (word :test #'string=)
-    ("and" :and)
-    ("class" :class)
-    ("else" :else)
-    ("false" :false)
-    ("for" :for)
-    ("fun" :fun)
-    ("if" :if)
-    ("nil" :nil)
-    ("or" :or)
-    ("print" :print)
-    ("return" :return)
-    ("super" :super)
-    ("this" :this)
-    ("true" :true)
-    ("var" :var)
-    ("while" :while)
-    (otherwise :identifier)))
+                     ("and" :and)
+                     ("class" :class)
+                     ("else" :else)
+                     ("false" :false)
+                     ("for" :for)
+                     ("fun" :fun)
+                     ("if" :if)
+                     ("nil" :nil)
+                     ("or" :or)
+                     ("print" :print)
+                     ("return" :return)
+                     ("super" :super)
+                     ("this" :this)
+                     ("true" :true)
+                     ("var" :var)
+                     ("while" :while)
+                     (otherwise :identifier)))
 
 (defun add-token (scanner token-type &optional literal)
   (with-slots (tokens source start current line) scanner
     (let ((lexeme (subseq source start current)))
       (alexandria:appendf tokens (list (make-token token-type lexeme literal line))))))
-
-(defun peek (scanner)
-  (peek-n scanner 0))
-
-(defun peek-next (scanner)
-  (peek-n scanner 1))
-
-(defun peek-n (scanner n)
-  (if (is-at-end scanner)
-      nil
-      (with-slots (current source) scanner
-        (elt source (+ n current)))))
-
-(defun advance (scanner)
-  (with-slots (current source) scanner
-    (incf current)
-    (elt source (1- current))))
 
 (defun is-char-digit (ch)
   (char<= #\0 ch #\9))
