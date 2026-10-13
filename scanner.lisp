@@ -32,9 +32,12 @@
         (elt source (+ n current)))))
 
 (defmethod advance ((stream scanner))
-  (with-slots (current source) stream
+  (with-slots (line current source) stream
     (incf current)
-    (elt source (1- current))))
+    (let ((ch (elt source (1- current))))
+      (if (char= ch #\Newline)
+          (incf line))
+      ch)))
 
 (defmethod is-at-end ((stream scanner))
   (with-slots (current source) stream
@@ -66,6 +69,15 @@
                      ("while" :while)
                      (otherwise :identifier)))
 
+(defun scan-string (source)
+  (let ((scanner (make-scanner source)))
+    (scan-tokens scanner)
+    (tokens scanner)))
+
+;; Utility function for testing
+(defun scan-string-to-string-list (source)
+  (mapcar #'token-to-string (scan-string source)))
+
 (defun add-token (scanner token-type &optional literal)
   (with-slots (tokens source start current line) scanner
     (let ((lexeme (subseq source start current)))
@@ -81,66 +93,101 @@
   (or (char<= #\a ch #\z)
       (char<= #\A ch #\Z)))
 
-(defun scan-token (scanner)
-  (labels ((tok-if-match (expected true-tok false-tok)
-             (cond
-               ((is-at-end scanner) false-tok)
-               ((eql (peek scanner) expected) true-tok)
-               (t false-tok)))
-           (consume-while-not (ch)
-             (consume-while-pred #'(lambda (c) (not (char= c ch)))))
-           (consume-while-pred (pred)
-             (loop for c = (peek scanner)
-                   until (or (not c) (not (funcall pred c)))
-                   when (char= c #\Newline)
-                     do (incf (line scanner))
-                   do (advance scanner)))
-           (consume-string ()
-             (consume-while-not #\")
+
+(defun consume-string (scanner)
+             (consume-while-not scanner #\")
              (if (is-at-end scanner)
-                 (report-error (line scanner) "Unterminated string"))
-             (advance scanner)
-             (add-token scanner :string (with-slots (source start current) scanner
-                                          (subseq source (1+ start) (1- current)))))
-           (consume-number ()
-             (consume-while-pred #'is-char-digit)
+                 (report-error (line scanner) "Unterminated string")
+                 (progn
+                   (advance scanner)
+                   (add-token scanner :string (with-slots (source start current) scanner
+                                                (subseq source (1+ start) (1- current)))))))
+(defun consume-number (scanner)
+             (consume-while-pred scanner #'is-char-digit)
              (when (and (not (is-at-end scanner))
                         (char= (peek scanner) #\.)
                         (is-char-digit (peek-next scanner)))
                (advance scanner)
-               (consume-while-pred #'is-char-digit))
+               (consume-while-pred scanner #'is-char-digit))
              (add-token scanner :num (with-slots (source start current) scanner
                                        (parse-float:parse-float source :start start :end current))))
-           (consume-identifier ()
-             (consume-while-pred #'is-char-alphanum)
+(defun consume-identifier (scanner)
+  (consume-while-pred scanner (lambda (c) (or (is-char-alphanum c)
+                                              (char= c #\_))))
              (add-token scanner (reserved-words (with-slots (source current start) scanner
-                                                  (subseq source start current))))))
-    (let* ((c (advance scanner))
-           (token-type (case c
-                         (#\( :left-paren)
-                         (#\) :right-paren)
-                         (#\{ :left-brace)
-                         (#\} :right-brace)
-                         (#\, :comma)
-                         (#\. :dot)
-                         (#\- :minus)
-                         (#\+ :plus)
-                         (#\; :semicolon)
-                         (#\* :star)
-                         (#\Space nil)
-                         (#\Return nil)
-                         (#\Tab nil)
-                         (#\" (consume-string))
-                         (#\Newline (incf (line scanner)) nil)
-                         (#\! (tok-if-match #\e :bang-equal :bang))
-                         (#\= (tok-if-match #\= :equal-equal :equal))
-                         (#\< (tok-if-match #\= :less-equal :less))
-                         (#\> (tok-if-match #\= :greater-equal :greater))
-                         (#\/ (if (char= (peek scanner) #\/)
-                                  (consume-while-not #\Newline)
-                                  :slash))
-                         (otherwise (cond ((is-char-digit c) (consume-number))
-                                          ((is-char-alpha c) (consume-identifier))
-                                          (t (report-error (line scanner) "Unrecognized character ~a" c)))
-                          nil))))
-      (if token-type (add-token scanner token-type)))))
+                                                  (subseq source start current)))))
+
+(defun scan-token (scanner)
+  (let* ((c (advance scanner))
+         (token-type (case c
+                       (#\( :left-paren)
+                       (#\) :right-paren)
+                       (#\{ :left-brace)
+                       (#\} :right-brace)
+                       (#\, :comma)
+                       (#\. :dot)
+                       (#\- :minus)
+                       (#\+ :plus)
+                       (#\; :semicolon)
+                       (#\* :star)
+                       (#\Space nil)
+                       (#\Return nil)
+                       (#\Tab nil)
+                       (#\" (consume-string scanner) nil)
+                       (#\Newline nil) ; advance method increments our lines for us
+                       (#\! (if-match scanner #\= :bang-equal :bang))
+                       (#\= (if-match scanner #\= :equal-equal :equal))
+                       (#\< (if-match scanner #\= :less-equal :less))
+                       (#\> (if-match scanner #\= :greater-equal :greater))
+                       (#\/ (if (and (peek scanner) (char= (peek scanner) #\/))
+                                (consume-while-not scanner #\Newline)
+                                :slash))
+                       (otherwise (cond ((is-char-digit c) (consume-number scanner))
+                                        ((or (is-char-alpha c) (char= c #\_)) (consume-identifier scanner))
+                                        (t (report-error (line scanner) "Unrecognized character ~a" c)))
+                        nil))))
+    (if token-type (add-token scanner token-type))))
+
+;;;; TESTS ---------------------------------
+(test-eq (scan-string-to-string-list "( ) {} , . - + ; * /")
+         '("LEFT-PAREN ( NIL" "RIGHT-PAREN ) NIL"
+           "LEFT-BRACE { NIL" "RIGHT-BRACE } NIL" "COMMA , NIL"
+           "DOT . NIL" "MINUS - NIL" "PLUS + NIL" "SEMICOLON ; NIL"
+           "STAR * NIL" "SLASH / NIL"))
+
+(test-eq (scan-string-to-string-list "!= == <= >= // A comment")
+         '("BANG-EQUAL != NIL"
+          "EQUAL-EQUAL == NIL"
+          "LESS-EQUAL <= NIL"
+          "GREATER-EQUAL >= NIL"))
+
+(test-eq (scan-string-to-string-list
+          " and
+            class
+            else
+            false
+            for
+            fun
+            if
+            nil
+            or
+            foo
+            bar
+            print
+            return
+            super
+            this
+            true
+            var
+            while ")
+         '("AND and NIL" "CLASS class NIL" "ELSE else NIL" "FALSE false NIL"
+           "FOR for NIL" "FUN fun NIL" "IF if NIL" "NIL nil NIL" "OR or NIL"
+           "IDENTIFIER foo NIL" "IDENTIFIER bar NIL"
+           "PRINT print NIL" "RETURN return NIL" "SUPER super NIL" "THIS this NIL"
+           "TRUE true NIL" "VAR var NIL" "WHILE while NIL"))
+
+(test-eq (scan-string-to-string-list "55.0 67")
+         '("NUM 55.0 55.0" "NUM 67 67.0"))
+
+(test-eq (scan-string-to-string-list "\" CRAZY \"")
+         '("STRING \" CRAZY \"  CRAZY "))
