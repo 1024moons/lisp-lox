@@ -9,10 +9,30 @@
     :initform 0
     :accessor current)))
 
+
+(defmethod peek-n ((stream parser) n)
+  (if (is-at-end stream)
+      nil
+      (with-slots (current toks) stream
+        (elt toks (+ n current)))))
+
+(defmethod advance ((stream parser))
+  (with-slots (current toks) stream
+    (incf current)
+    (elt toks (1- current))))
+
+(defmethod is-at-end ((stream parser))
+  (with-slots (current toks) stream
+    (>= current (length toks))))
+
 (defun check (parser type)
   (cond
-	((is-at-end parser) nil)
-	(t (eq (tok-type (peek parser)) type))))
+    ((is-at-end parser) nil)
+    (t (eq (tok-type (peek parser)) type))))
+
+(defun previous (parser)
+  (with-slots (toks current) parser
+      (elt toks (1- current))))
 
 (defun match (parser &rest types)
   (when (loop for type in types
@@ -26,10 +46,56 @@
 (defun parse-expression (parser)
   (parse-equality parser))
 
-(defun parse-equality (parser)
-  (let ((expr (comparison parser)))
-    (loop while (match parser :bang-equal :equal-equal)
-          for operator = (previous parser)
-          for right = (parse-comparison parser)
-          do (setf expr (create-binary-expr expr operator right)))
-    expr))
+(defmacro create-left-assoc-binary-parser (name higher-rule &rest operators)
+  `(defun ,name (parser)
+     (let ((expr (,higher-rule parser)))
+       (loop while (match parser ,@operators)
+             for operator = (previous parser)
+             for right = (,higher-rule parser)
+             do (setf expr (create-binary-expr expr right operator )))
+       expr)))
+
+(create-left-assoc-binary-parser parse-equality
+                                 parse-comparison
+                                 :bang-equal :equal-equal)
+
+(create-left-assoc-binary-parser parse-comparison
+                                 parse-term
+                                 :greater-equal :greater :less-equal :less)
+
+(create-left-assoc-binary-parser parse-term
+                                 parse-factor
+                                 :minus :plus)
+
+(create-left-assoc-binary-parser parse-factor
+                                 parse-unary
+                                 :slash :star)
+
+(defun parse-unary (parser)
+  (if (match parser :minus :bang)
+      (let ((operator (previous parser))
+            (right (parse-unary parser)))
+        (create-unary-expr right operator))
+      (parse-primary parser)))
+
+(defun parse-primary (parser)
+  (cond
+    ((match :false) (create-literal-expr :false)
+     (match :true)  (create-literal-expr :true)
+     (match :nil)   (create-literal-expr :nil)
+     (match :number :string) (create-literal-expr (literal (previous parser)))
+     (match :left-paren) (let ((expr parse-expression))
+                           (next-is parser :right-paren "Expected a closing )")
+                           (create-grouping-expr expr)))))
+
+
+
+;; This is my version of Nystrom's consume method
+;; Because i'm doing this all in one namespace I find that
+;; the name "consume" shares too much with the lexer functions
+;; when conceptually this is a much stricter operation
+;; Hence, the new name, this can be considered a type of assert
+(defun next-is (parser type &optional err)
+  nil)
+
+;; TODO: How to translate from Nystrom's exception handling -> CL conditions

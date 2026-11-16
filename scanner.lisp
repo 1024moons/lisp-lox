@@ -25,6 +25,7 @@
 (defun make-scanner (source)
   (make-instance 'scanner :source source))
 
+
 (defmethod peek-n ((stream scanner) n)
   (if (is-at-end stream)
       nil
@@ -32,12 +33,9 @@
         (elt source (+ n current)))))
 
 (defmethod advance ((stream scanner))
-  (with-slots (line current source) stream
+  (with-slots (current source) stream
     (incf current)
-    (let ((ch (elt source (1- current))))
-      (if (char= ch #\Newline)
-          (incf line))
-      ch)))
+    (elt source (1- current))))
 
 (defmethod is-at-end ((stream scanner))
   (with-slots (current source) stream

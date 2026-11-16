@@ -3,7 +3,7 @@
 
 (in-package :lox)
 
-
+(defparameter *had-error* nil)
 
 (defun start-repl ()
   (loop for input = (read-line *standard-input* nil 'eof)
