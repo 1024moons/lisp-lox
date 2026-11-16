@@ -20,3 +20,15 @@
 (defexpr unary-expr right operator-token)
 (defexpr literal-expr val)
 (defexpr grouping-expr expr)
+
+(defgeneric view-ast (expr)
+  (:documentation "Returns a human readable string representation of the AST"))
+
+(defmethod view-ast ((expr grouping-expr))
+  (format nil "(~a)" (view-ast (expr expr))))
+
+(defmethod view-ast ((expr unary-expr))
+  (format nil "~a~a" (lexeme (operator-token expr)) (view-ast (right expr))))
+
+(defmethod view-ast ((expr binary-expr))
+  (format nil "~a ~a ~a" (view-ast (left expr)) (lexeme (operator-token expr)) (view-ast (right expr))))

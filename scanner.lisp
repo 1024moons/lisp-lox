@@ -24,23 +24,24 @@
 
 (defun make-scanner (source)
   (make-instance 'scanner :source source))
-
-
 (defmethod peek-n ((stream scanner) n)
-  (if (is-at-end stream)
-      nil
-      (with-slots (current source) stream
-        (elt source (+ n current)))))
-
+   (if (is-at-end stream)
+       nil
+       (with-slots (current source) stream
+         (elt source (+ n current)))))
+ 
 (defmethod advance ((stream scanner))
-  (with-slots (current source) stream
-    (incf current)
-    (elt source (1- current))))
-
-(defmethod is-at-end ((stream scanner))
-  (with-slots (current source) stream
-    (>= current (length source))))
-
+  (with-slots (line current source) stream
+     (incf current)
+    (let ((ch (elt source (1- current))))
+      (if (char= ch #\Newline)
+          (incf line))
+      ch)))
+ 
+ (defmethod is-at-end ((stream scanner))
+   (with-slots (current source) stream
+     (>= current (length source))))
+ 
 (defun scan-tokens (scanner)
   (loop until (is-at-end scanner)
         do (progn
