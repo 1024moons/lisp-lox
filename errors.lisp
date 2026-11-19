@@ -5,4 +5,5 @@
   `(progn
      (format t "[Line ~a] " ,line)
      (format t ,msg ,@rest)
+     (format t "~%")
      (setf *had-error* t)))

@@ -28,7 +28,10 @@
   (format nil "(~a)" (view-ast (expr expr))))
 
 (defmethod view-ast ((expr unary-expr))
-  (format nil "~a~a" (lexeme (operator-token expr)) (view-ast (right expr))))
+  (format nil "(~a ~a)" (lexeme (operator-token expr)) (view-ast (right expr))))
 
 (defmethod view-ast ((expr binary-expr))
-  (format nil "~a ~a ~a" (view-ast (left expr)) (lexeme (operator-token expr)) (view-ast (right expr))))
+  (format nil "(~a ~a ~a)" (view-ast (left expr)) (lexeme (operator-token expr)) (view-ast (right expr))))
+
+(defmethod view-ast ((expr literal-expr))
+  (format nil "~a" (val expr)))

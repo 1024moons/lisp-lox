@@ -14,4 +14,7 @@
   (setf *had-error* nil)
   (let ((scanner (make-scanner input)))
     (scan-tokens scanner)
-    (mapcan #'token-to-string (tokens scanner))))
+    (let* ((parser (create-parser (tokens scanner)))
+           (expr (try-parse-expression parser)))
+      (if expr
+          (view-ast expr)))))

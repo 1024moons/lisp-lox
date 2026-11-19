@@ -46,6 +46,12 @@
 (defun parse-expression (parser)
   (parse-equality parser))
 
+(defun try-parse-expression (parser)
+  (handler-case
+      (parse-expression parser)
+    (parser-error (c)
+      nil)))
+
 (defmacro create-left-assoc-binary-parser (name higher-rule &rest operators)
   `(defun ,name (parser)
      (let ((expr (,higher-rule parser)))
@@ -80,15 +86,23 @@
 
 (defun parse-primary (parser)
   (cond
-    ((match :false) (create-literal-expr :false)
-     (match :true)  (create-literal-expr :true)
-     (match :nil)   (create-literal-expr :nil)
-     (match :number :string) (create-literal-expr (literal (previous parser)))
-     (match :left-paren) (let ((expr parse-expression))
+    ((match parser :false) (create-literal-expr :false))
+    ((match parser :true)  (create-literal-expr :true))
+    ((match parser :nil)   (create-literal-expr :nil))
+    ((match parser :num :string) (create-literal-expr (tok-literal (previous parser))))
+    ((match parser :left-paren) (let ((expr (parse-expression parser)))
                            (next-is parser :right-paren "Expected a closing )")
-                           (create-grouping-expr expr)))))
+                           (create-grouping-expr expr)))
+    (t (error (create-parser-error (peek parser) "Expected an expression")))))
 
+(define-condition parser-error (error)
+  ())
 
+(defun create-parser-error (tok message)
+  (if (eq (tok-type tok) :eof)
+      (report-error (tok-line tok) "at end: ~a"  message)
+      (report-error (tok-line tok) "at ~a: ~a" (lexeme tok) message))
+  (make-condition 'parser-error))
 
 ;; This is my version of Nystrom's consume method
 ;; Because i'm doing this all in one namespace I find that
@@ -96,6 +110,7 @@
 ;; when conceptually this is a much stricter operation
 ;; Hence, the new name, this can be considered a type of assert
 (defun next-is (parser type &optional err)
-  nil)
+  (if (check parser type)
+      (advance parser)
+      (error (create-parser-error (peek parser) err))))
 
-;; TODO: How to translate from Nystrom's exception handling -> CL conditions
