@@ -114,3 +114,12 @@
       (advance parser)
       (error (create-parser-error (peek parser) err))))
 
+(defun parse-string-into-string (source)
+  (let* ((scanner (make-scanner source))
+         (parser (progn
+                   (scan-tokens scanner)
+                   (create-parser (tokens scanner)))))
+    (view-ast (try-parse-expression parser))))
+
+(test-eq (parse-string-into-string "10 * false / (6 == 7) + true > nil == 57")
+         "(((((10.0 * FALSE) / ((6.0 == 7.0))) + TRUE) > NIL) == 57.0)")
