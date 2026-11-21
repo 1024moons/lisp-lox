@@ -49,7 +49,7 @@
 (defun try-parse-expression (parser)
   (handler-case
       (parse-expression parser)
-    (parser-error (c)
+    (parser-error ()
       nil)))
 
 (defmacro create-left-assoc-binary-parser (name higher-rule &rest operators)
